@@ -1,0 +1,39 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "aspName": {
+            "type": "String"
+        },
+		"dateCreatedTagValue": {
+			"type": "string",
+			"defaultValue": "[utcNow('yyyy-MM-dd')]"
+		}
+    },
+    "resources": [
+        {
+            "type": "Microsoft.Web/serverfarms",
+            "apiVersion": "2018-11-01",
+            "name": "[parameters('aspName')]",
+            "location": "East US 2",
+            "tags": {
+                "date-created": "[parameters('dateCreatedTagValue')]",
+                "lifetime": "medium",
+                "purpose": "demo",
+                "OS": "Linux"
+            },
+            "sku": {
+                "Tier": "Standard",
+                "Name": "S1"
+            },
+            "kind": "linux",
+            "properties": {
+                "name": "[parameters('aspName')]",
+                "workerSize": "0",
+                "workerSizeId": "0",
+                "numberOfWorkers": "1",
+                "reserved": true
+            }
+        }
+    ]
+}
