@@ -19,6 +19,9 @@ class PublishInfo {
 	[string]$Url
 }
 
+# Define the format for the counter
+[int]$NumDigits = $studentCount.ToString().Length
+
 # Create the array variable to hold the usernames, passwords, and URLs
 $fileContents = @(
 )
@@ -29,18 +32,18 @@ for ($studentCounter = 1; $studentCounter -le $studentCount; $studentCounter++) 
 	Write-Verbose "Processing student $studentCounter of $studentCount"
 	[bool]$createPlan = ((($studentCounter - 1) % 30) -eq 0)
 
-	#TODO: format numbers based on number of students, e.g., 01, 02, ... or 001, 002, etc.
+	$CommonNamePart = "$classCode-{0:d$NumDigits}" -f $studentCounter
 
 	if ($createPlan) {
 		# A better way might be to calculate how many ASPs are necessary, creating them, and then equally distributing students among them
 		Write-Verbose "Creating new App Service Plan"
-		$aspName = "$classCode-$studentCounter"
+		$aspName = "asp-$CommonNamePart"
 
 		# Create a new App Service Plan for every 30 students
 		New-AzResourceGroupDeployment -ResourceGroupName $rgName `
-			-Name "AppServicePlan-$aspName-Deployment" `
+			-Name "$aspName-Deployment" `
 			-aspName $aspName `
-			-TemplateFile .\AppServicePlan-template.json
+			-TemplateFile .\AppServicePlan-template.json | Out-Null
 
 		# Capture info about the plan to use when creating Apps
 		$plan = Get-AzAppServicePlan -ResourceGroupName $rgName -Name $aspName
@@ -48,15 +51,17 @@ for ($studentCounter = 1; $studentCounter -le $studentCount; $studentCounter++) 
 		Write-Host "Created App Service Plan $aspName"
 	}
 
-	$appName = $aspName
+	$appName = "app-$CommonNamePart"
 
 	# Create a new App Service for each student
 	New-AzResourceGroupDeployment -ResourceGroupName $rgName `
-		-Name "AppService-$appName-Deployment" `
+		-Name "$appName-Deployment" `
 		-appName $appName `
 		-appServicePlanId $plan.Id `
 		-location $plan.Location `
-		-TemplateFile .\AppService-template.json
+		-TemplateFile .\AppService-template.json | Out-Null
+
+	Write-Host "`tCreated App Service $appName"
 
 	# Get the publish profile, in XML
 	[xml]$pubProfile = Get-AzWebAppPublishingProfile -ResourceGroupName $rgName `
