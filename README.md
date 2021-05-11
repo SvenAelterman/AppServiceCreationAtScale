@@ -38,3 +38,11 @@ Example: if you provide `CS101-FA21` as the classCode value, your resources will
 
 ### studentCount
 The number of App Services to be created. For each 30 app services, an app service plan is created.
+
+## Example
+
+```PowerShell
+.\New-AppServiceScale.ps1 'rg-AppServiceClass-eastus2-01' CS101-FA21 50
+```
+
+The command above will create 50 App Services across 2 App Service Plans (30 App Services in the first, 20 in the second) in an existing resource group `rg-AppServiceClass-eastus2-01`.
