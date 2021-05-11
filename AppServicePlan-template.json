@@ -5,10 +5,10 @@
         "aspName": {
             "type": "String"
         },
-		"dateCreatedTagValue": {
-			"type": "string",
-			"defaultValue": "[utcNow('yyyy-MM-dd')]"
-		}
+        "dateCreatedTagValue": {
+            "type": "string",
+            "defaultValue": "[utcNow('yyyy-MM-dd')]"
+        }
     },
     "resources": [
         {
