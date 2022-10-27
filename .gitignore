@@ -1,1 +1,2 @@
+# Exclude the script output from source control
 *.csv

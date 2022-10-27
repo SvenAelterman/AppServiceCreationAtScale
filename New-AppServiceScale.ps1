@@ -1,3 +1,6 @@
+#Requires -Modules "Az"
+#Requires -PSEdition Core
+
 [CmdletBinding()]
 param (
 	[Parameter(Mandatory, Position = 1)]
@@ -5,7 +8,7 @@ param (
 	[Parameter(Mandatory, Position = 2)]
 	[string]$classCode,
 	[Parameter(Mandatory, Position = 3)]
-	[ValidateRange(1,200)]
+	[ValidateRange(1, 200)]
 	[int]$studentCount
 )
 
@@ -16,7 +19,8 @@ class PublishInfo {
 	[int]$Student
 	[string]$UserName
 	[string]$Password
-	[string]$Url
+	[string]$FtpUrl
+	[string]$HttpUrl
 }
 
 # Define the format for the counter
@@ -37,13 +41,13 @@ for ($studentCounter = 1; $studentCounter -le $studentCount; $studentCounter++) 
 	if ($createPlan) {
 		# A better way might be to calculate how many ASPs are necessary, creating them, and then equally distributing students among them
 		Write-Verbose "Creating new App Service Plan"
-		$aspName = "asp-$CommonNamePart"
+		$aspName = "plan-$CommonNamePart"
 
 		# Create a new App Service Plan for every 30 students
 		New-AzResourceGroupDeployment -ResourceGroupName $rgName `
 			-Name "$aspName-Deployment" `
 			-aspName $aspName `
-			-TemplateFile .\AppServicePlan-template.json | Out-Null
+			-TemplateFile .\AppServicePlan-template.bicep | Out-Null
 
 		# Capture info about the plan to use when creating Apps
 		$plan = Get-AzAppServicePlan -ResourceGroupName $rgName -Name $aspName
@@ -59,13 +63,21 @@ for ($studentCounter = 1; $studentCounter -le $studentCount; $studentCounter++) 
 		-appName $appName `
 		-appServicePlanId $plan.Id `
 		-location $plan.Location `
-		-TemplateFile .\AppService-template.json | Out-Null
+		-TemplateFile .\AppService-template.bicep | Out-Null
 
 	Write-Host "`tCreated App Service $appName"
 
 	# Get the publish profile, in XML
 	[xml]$pubProfile = Get-AzWebAppPublishingProfile -ResourceGroupName $rgName `
 		-Name $appName -Format Ftp -OutputFile $null
+	$appSvc = Get-AzWebApp -ResourceGroupName $rgName -Name $appName
+	# TODO: Finish
+	$appHostName = $appSvc.HostNames[0]
+
+	# TODO: HTTPS should actually always work
+	$appTlsEnabled = ($appSvc.HostNameSslStates | Where-Object { $_.Name -eq $appHostName }).SslState -eq "Enabled"
+
+	$url = "http$($appTlsEnabled ? 's' : '')://$appHostName"
 
 	# Extract the relevant values from the XML object
 	$userName = $pubProfile.SelectNodes("//publishProfile[@publishMethod=`"FTP`"]/@userName").value
@@ -74,10 +86,11 @@ for ($studentCounter = 1; $studentCounter -le $studentCount; $studentCounter++) 
 
 	# Add line to the output file
 	$fileContents += [PublishInfo]@{
-		Student = $studentCounter
+		Student  = $studentCounter
 		UserName = $userName
 		Password = $password
-		Url = $ftpUrl
+		FtpUrl   = $ftpUrl
+		HttpUrl  = $url
 	}
 }
 
