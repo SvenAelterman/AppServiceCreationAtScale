@@ -1,8 +1,9 @@
 param appName string
 param appServicePlanId string
+param location string
+
 param linuxFxVersion string = 'NODE|14-lts'
-param location string = 'East US 2'
-param dateCreatedTagValue string = utcNow('yyyy-MM-dd')
+param tags object = {}
 
 @allowed([
   'Linux'
@@ -10,14 +11,10 @@ param dateCreatedTagValue string = utcNow('yyyy-MM-dd')
 ])
 param OS string = 'Linux'
 
-resource appName_resource 'Microsoft.Web/sites@2022-03-01' = {
+resource appService 'Microsoft.Web/sites@2022-03-01' = {
   name: appName
   location: location
-  tags: {
-    'date-created': dateCreatedTagValue
-    lifetime: 'medium'
-    purpose: 'demo'
-  }
+  tags: tags
   properties: {
     siteConfig: {
       appSettings: []
@@ -32,7 +29,7 @@ resource appName_resource 'Microsoft.Web/sites@2022-03-01' = {
 
 resource linuxConfig 'Microsoft.Web/sites/config@2022-03-01' = if (OS == 'Linux') {
   name: 'web'
-  parent: appName_resource
+  parent: appService
   properties: {
     javaContainer: 'TOMCAT'
     javaContainerVersion: '10.0'
@@ -41,10 +38,7 @@ resource linuxConfig 'Microsoft.Web/sites/config@2022-03-01' = if (OS == 'Linux'
   }
 }
 
-//resource winConfig 'Microsoft.Web/sites/config@2022-03-01' = if (OS != 'Linux') {
-//  name: 'web'
-//  parent: appName_resource
-//  properties: {
-//    netFrameworkVersion: 'v4.0'
-//  }
-//}
+// No additional config required for .NET
+
+output hostName string = appService.properties.hostNames[0]
+output sslEnabled bool = appService.properties.hostNameSslStates[0].sslState == 'Enabled'

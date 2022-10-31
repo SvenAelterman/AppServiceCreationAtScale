@@ -1,31 +1,46 @@
-param aspName string
-param dateCreatedTagValue string = utcNow('yyyy-MM-dd')
-param location string = 'eastus2'
+param location string
+param classCode string
+
+@minValue(1)
+param appCount int = 1
+@minValue(1)
+param planIndex int = 1
+param linuxFxVersion string = 'NODE|14-lts'
+
+param tags object = {}
 
 @allowed([
   'linux'
-  'Windows'
+  'windows'
 ])
 param OS string = 'linux'
 
-resource aspName_resource 'Microsoft.Web/serverfarms@2022-03-01' = {
+var planIndexFormatted = padLeft(planIndex, length(string(planIndex)), '0')
+var aspName = 'asp-${classCode}-${planIndexFormatted}'
+
+resource appServicePlan 'Microsoft.Web/serverfarms@2022-03-01' = {
   name: aspName
   location: location
-  tags: {
-    'date-created': dateCreatedTagValue
-    lifetime: 'medium'
-    purpose: 'demo'
-    OS: OS
-  }
+  tags: tags
   sku: {
     tier: 'Standard'
     name: 'S1'
   }
   kind: (OS == 'linux') ? OS : 'app'
   properties: {
-    workerSize: '0'
-    workerSizeId: '0'
-    numberOfWorkers: '1'
     reserved: true
   }
 }
+
+module appServiceModule 'AppService-template.bicep' = [for i in range(1, appCount): {
+  name: 'appService-${aspName}-${i}'
+  params: {
+    appName: 'app-${classCode}-${planIndex}-${padLeft(i, length(string(appCount)), '0')}'
+    appServicePlanId: appServicePlan.id
+    location: location
+    linuxFxVersion: linuxFxVersion
+  }
+}]
+
+output planIndex int = planIndex
+output hostNames array = [for i in range(1, appCount): appServiceModule[i - 1].outputs.hostName]
