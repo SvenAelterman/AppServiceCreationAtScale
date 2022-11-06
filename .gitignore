@@ -1,2 +1,3 @@
 # Exclude the script output from source control
 *.csv
+*.user.ps1
