@@ -51,12 +51,12 @@ if ($DeploymentResults.ProvisioningState -eq "Succeeded") {
 	# Loop through all app names (by app service plan) and retrieve publishing details
 	for ($AppServicePlan = 0; $AppServicePlan -lt $AppNames.Count; $AppServicePlan++) {
 		$AppServiceNames = $AppNames[$AppServicePlan].ToString() | ConvertFrom-Json
-		Write-Verbose "Sites in App Service Plan ${AppServicePlan}:`n$AppServiceNames`n"
+		Write-Verbose "`nSites in App Service Plan ${AppServicePlan}:`n$AppServiceNames`n"
 		
 		foreach ($AppServiceName in $AppServiceNames) {
 			$StudentCounter++
 
-			Write-Verbose "Retrieving publish profile and details for [$AppServicePlan][$AppService]: $AppServiceName"
+			Write-Verbose "Retrieving publish profile and details for: $AppServiceName"
 
 			# Get the App Service object
 			$AppSvc = Get-AzWebApp -ResourceGroupName $ResourceGroupName -Name $AppServiceName
@@ -84,8 +84,14 @@ if ($DeploymentResults.ProvisioningState -eq "Succeeded") {
 			}
 		}
 	}
-}
 
-# Write the output file
-$fileName = "$ClassCode.csv"
-$fileContents | Export-Csv $fileName -NoTypeInformation
+	# Write the output file
+	$FileName = "$ClassCode.csv"
+	$fileContents | Export-Csv $fileName -NoTypeInformation
+
+	Write-Host "CSV file $FileName written."
+}
+else {
+	Write-Host $DeploymentResults
+	Write-Error "❌ Deployment failed. See the output above for details. 👎"
+}

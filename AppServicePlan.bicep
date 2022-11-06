@@ -32,7 +32,7 @@ resource appServicePlan 'Microsoft.Web/serverfarms@2022-03-01' = {
   }
 }
 
-module appServiceModule 'AppService-template.bicep' = [for i in range(1, appCount): {
+module appServiceModule 'AppService.bicep' = [for i in range(1, appCount): {
   name: 'appService-${aspName}-${i}'
   params: {
     appName: 'app-${classCode}-${planIndex}-${padLeft(i, length(string(appCount)), '0')}'

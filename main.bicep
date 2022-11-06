@@ -42,7 +42,7 @@ resource resourceGroup 'Microsoft.Resources/resourceGroups@2021-04-01' = {
   location: location
 }
 
-module appServiceAndPlanModule 'AppServicePlan-template.bicep' = [for i in range(1, plansRequired): {
+module appServiceAndPlanModule 'AppServicePlan.bicep' = [for i in range(1, plansRequired): {
   name: 'appServiceAndPlan-${i}-${classCode}'
   scope: resourceGroup
   params: {
