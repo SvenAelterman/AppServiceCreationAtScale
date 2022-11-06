@@ -4,12 +4,13 @@
 [CmdletBinding()]
 param (
 	[Parameter(Mandatory, Position = 1)]
-	[string]$rgName,
+	[string]$ResourceGroupName,
 	[Parameter(Mandatory, Position = 2)]
-	[string]$classCode,
+	[string]$ClassCode,
 	[Parameter(Mandatory, Position = 3)]
 	[ValidateRange(1, 200)]
-	[int]$studentCount
+	[int]$StudentCount,
+	[string]$Location = 'eastus'
 )
 
 Set-StrictMode -Version Latest
@@ -23,77 +24,68 @@ class PublishInfo {
 	[string]$HttpUrl
 }
 
-# Define the format for the counter
-[int]$NumDigits = $studentCount.ToString().Length
-
 # Create the array variable to hold the usernames, passwords, and URLs
 $fileContents = @(
 )
 
-[Microsoft.Azure.Management.WebSites.Models.AppServicePlan]$plan = $null
+$TemplateParameters = @{
+	location          = $Location
+	studentCount      = $StudentCount
+	resourceGroupName = $ResourceGroupName
+	classCode         = $ClassCode
+}
 
-for ($studentCounter = 1; $studentCounter -le $studentCount; $studentCounter++) {
-	Write-Verbose "Processing student $studentCounter of $studentCount"
-	[bool]$createPlan = ((($studentCounter - 1) % 30) -eq 0)
+$DeploymentResults = New-AzDeployment -Name "AppServiceScale-Deployment"  -Location $Location `
+	-TemplateFile .\main.bicep -TemplateParameterObject $TemplateParameters
 
-	$CommonNamePart = "$classCode-{0:d$NumDigits}" -f $studentCounter
+Write-Verbose $DeploymentResults
 
-	if ($createPlan) {
-		# A better way might be to calculate how many ASPs are necessary, creating them, and then equally distributing students among them
-		Write-Verbose "Creating new App Service Plan"
-		$aspName = "plan-$CommonNamePart"
+if ($DeploymentResults.ProvisioningState -eq "Succeeded") {
+	Write-Host "🔥 Deployment successful. Outputting CSV... 🙂"
 
-		# Create a new App Service Plan for every 30 students
-		New-AzResourceGroupDeployment -ResourceGroupName $rgName `
-			-Name "$aspName-Deployment" `
-			-aspName $aspName `
-			-TemplateFile .\AppServicePlan-template.bicep | Out-Null
+	$AppNames = $DeploymentResults.Outputs.appNames.Value
+	Write-Verbose "Found $($AppNames.Count) App Service Plans"
 
-		# Capture info about the plan to use when creating Apps
-		$plan = Get-AzAppServicePlan -ResourceGroupName $rgName -Name $aspName
+	[int]$StudentCounter = 0
+
+	# Loop through all app names (by app service plan) and retrieve publishing details
+	for ($AppServicePlan = 0; $AppServicePlan -lt $AppNames.Count; $AppServicePlan++) {
+		$AppServiceNames = $AppNames[$AppServicePlan].ToString() | ConvertFrom-Json
+		Write-Verbose "Sites in App Service Plan ${AppServicePlan}:`n$AppServiceNames`n"
 		
-		Write-Host "Created App Service Plan $aspName"
-	}
+		foreach ($AppServiceName in $AppServiceNames) {
+			$StudentCounter++
 
-	$appName = "app-$CommonNamePart"
+			Write-Verbose "Retrieving publish profile and details for [$AppServicePlan][$AppService]: $AppServiceName"
 
-	# Create a new App Service for each student
-	New-AzResourceGroupDeployment -ResourceGroupName $rgName `
-		-Name "$appName-Deployment" `
-		-appName $appName `
-		-appServicePlanId $plan.Id `
-		-location $plan.Location `
-		-TemplateFile .\AppService-template.bicep | Out-Null
+			# Get the App Service object
+			$AppSvc = Get-AzWebApp -ResourceGroupName $ResourceGroupName -Name $AppServiceName
+			# Get the publish profile in XML
+			[xml]$PubProfile = Get-AzWebAppPublishingProfile -ResourceGroupName $ResourceGroupName `
+				-Name $AppServiceName -Format Ftp -OutputFile $null
+			
+			# Determine the URL of the site
+			$AppHostName = $AppSvc.HostNames[0]
+			# HTTPS should actually always work with the default hostname
+			$AppTlsEnabled = ($AppSvc.HostNameSslStates | Where-Object { $_.Name -eq $AppHostName }).SslState -eq "Enabled"
+			$Url = "http$($AppTlsEnabled ? 's' : '')://$AppHostName"
 
-	Write-Host "`tCreated App Service $appName"
-
-	# Get the publish profile, in XML
-	[xml]$pubProfile = Get-AzWebAppPublishingProfile -ResourceGroupName $rgName `
-		-Name $appName -Format Ftp -OutputFile $null
-	$appSvc = Get-AzWebApp -ResourceGroupName $rgName -Name $appName
-	# TODO: Finish
-	$appHostName = $appSvc.HostNames[0]
-
-	# TODO: HTTPS should actually always work
-	$appTlsEnabled = ($appSvc.HostNameSslStates | Where-Object { $_.Name -eq $appHostName }).SslState -eq "Enabled"
-
-	$url = "http$($appTlsEnabled ? 's' : '')://$appHostName"
-
-	# Extract the relevant values from the XML object
-	$userName = $pubProfile.SelectNodes("//publishProfile[@publishMethod=`"FTP`"]/@userName").value
-	$password = $pubProfile.SelectNodes("//publishProfile[@publishMethod=`"FTP`"]/@userPWD").value
-	$ftpUrl = $pubProfile.SelectNodes("//publishProfile[@publishMethod=`"FTP`"]/@publishUrl").value
-
-	# Add line to the output file
-	$fileContents += [PublishInfo]@{
-		Student  = $studentCounter
-		UserName = $userName
-		Password = $password
-		FtpUrl   = $ftpUrl
-		HttpUrl  = $url
+			# Extract the relevant values from the XML object
+			$UserName = $PubProfile.SelectNodes("//publishProfile[@publishMethod=`"FTP`"]/@userName").value
+			$Password = $PubProfile.SelectNodes("//publishProfile[@publishMethod=`"FTP`"]/@userPWD").value
+			$FtpUrl = $PubProfile.SelectNodes("//publishProfile[@publishMethod=`"FTP`"]/@publishUrl").value
+				
+			$fileContents += [PublishInfo]@{
+				Student  = $StudentCounter
+				UserName = $UserName
+				Password = $Password
+				FtpUrl   = $FtpUrl
+				HttpUrl  = $Url
+			}
+		}
 	}
 }
 
 # Write the output file
-$fileName = "$classCode.csv"
+$fileName = "$ClassCode.csv"
 $fileContents | Export-Csv $fileName -NoTypeInformation

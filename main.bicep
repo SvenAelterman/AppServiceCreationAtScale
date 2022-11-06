@@ -1,9 +1,13 @@
 targetScope = 'subscription'
 
-param resourceGroupName string = 'rg-appsvcscale-test-eastus-01'
-param classCode string = 'test02'
-param location string = 'eastus'
+// REQUIRED PARAMETERS
+param resourceGroupName string
+param classCode string
+@minValue(1)
+param studentCount int
 
+// OPTIONAL PARAMETERS
+param location string = 'eastus'
 @allowed([
   'linux'
   'windows'
@@ -11,14 +15,12 @@ param location string = 'eastus'
 param OS string = 'linux'
 param linuxFxVersion string = 'NODE|14-lts'
 @minValue(1)
-param studentCount int = 11
-@minValue(1)
 @maxValue(100)
-param maxAppsPerPlan int = 10
+param maxAppsPerPlan int = 30
 param dateCreatedTagValue string = utcNow('yyyy-MM-dd')
-
 param tags object = {}
 
+// VARIABLES
 var defaultTags = {
   'date-created': dateCreatedTagValue
   lifetime: 'medium'
@@ -64,5 +66,8 @@ output actualAppsPerPlan array = actualAppsPerPlan
 output numberOfAppsCalculated int = numberOfAppsCalculated
 output numberOfAppsMatchesStudentCount bool = (studentCount == numberOfAppsCalculated)
 
-output hostNames array = [for i in range(0, plansRequired): reduce(appServiceAndPlanModule[i].outputs.hostNames, null, (previous, current) => '${previous},${current}')]
+//output flatHostNames array = [for i in range(0, plansRequired): reduce(appServiceAndPlanModule[i].outputs.hostNames, null, (previous, current) => '${previous},${current}')]
+//output hostNames array = [for i in range(0, plansRequired): appServiceAndPlanModule[i].outputs.hostNames]
+output appNames array = [for i in range(0, plansRequired): appServiceAndPlanModule[i].outputs.appNames]
+output aspNames array = [for i in range(0, plansRequired): appServiceAndPlanModule[i].outputs.appServicePlanName]
 //output hostNames array = map(reduce(appServiceAndPlan, [], ), arg => arg.outputs.hostNames)

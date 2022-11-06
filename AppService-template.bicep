@@ -2,7 +2,7 @@ param appName string
 param appServicePlanId string
 param location string
 
-param linuxFxVersion string = 'NODE|14-lts'
+param linuxFxVersion string = 'NODE|18-lts'
 param tags object = {}
 
 @allowed([
@@ -40,5 +40,4 @@ resource linuxConfig 'Microsoft.Web/sites/config@2022-03-01' = if (OS == 'Linux'
 
 // No additional config required for .NET
 
-output hostName string = appService.properties.hostNames[0]
-output sslEnabled bool = appService.properties.hostNameSslStates[0].sslState == 'Enabled'
+output appName string = appService.name

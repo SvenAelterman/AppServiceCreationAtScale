@@ -5,7 +5,7 @@ param classCode string
 param appCount int = 1
 @minValue(1)
 param planIndex int = 1
-param linuxFxVersion string = 'NODE|14-lts'
+param linuxFxVersion string = 'NODE|18-lts'
 
 param tags object = {}
 
@@ -39,8 +39,10 @@ module appServiceModule 'AppService-template.bicep' = [for i in range(1, appCoun
     appServicePlanId: appServicePlan.id
     location: location
     linuxFxVersion: linuxFxVersion
+    tags: tags
   }
 }]
 
 output planIndex int = planIndex
-output hostNames array = [for i in range(1, appCount): appServiceModule[i - 1].outputs.hostName]
+output appNames array = [for i in range(0, appCount): appServiceModule[i].outputs.appName]
+output appServicePlanName string = appServicePlan.name
